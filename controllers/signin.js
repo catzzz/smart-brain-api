@@ -1,4 +1,16 @@
 var jwt = require('jsonwebtoken');
+// Redis Setup
+const redis = require('redis');
+
+// You will want to update your host to the proper address in production
+const redisClient = redis.createClient(process.env.REDIS_URI);
+
+
+
+
+redisClient.on("error", function(error) {
+  console.error(error);
+});
 
 
 const handleSignin = (db, bcrypt, req, res) => {
@@ -35,13 +47,18 @@ const signToken = (email) => {
   return jwt.sign(jwtPayload, 'JWT-SERECT', {expiresIn:'2 day'});
 }
 
-const createSessions = (user) => {
-  // JWT token , return user data
-  const {email, id} = user;
-  var token = signToken(email);
-  return {succss:'true', userId:id, token:token}
+const setToken = (key, value) => Promise.resolve(redisClient.set(key, value));
 
-}
+const createSessions = (user) => {
+  const { email, id } = user;
+  const token = signToken(email);
+  return setToken(token, id)
+    .then(() => {
+      return { success: 'true', userId: id, token, user }
+    })
+    .catch(console.log);
+};
+
 
 const signinAuthentication = (db, bcrypt) => (req, res) => {
   const { authorization } = req.headers;
